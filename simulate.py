@@ -90,10 +90,53 @@ class Simulate():
         except Exception as e:
             print("Exception in intializaing Simulatr class: {}". format(e))
 
+    def ssh_to_remote_machine(self, retry=5):
+        try:
+            if not self.VPNConnect:
+                print("In if condition of ssh connectc")
+                self.ssh = paramiko.SSHClient()
+                self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                self.ssh.connect(self.ip_address, username=self.userName, password=self.password)
+            else:
+                print("In else condition of sshConnect")
+                self.ssh = paramiko.SSHClient()
+                self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                self.ssh.connect("192.168.34.77", username="root", password="root123")
+                self.shell = self.ssh.get_transport().opem_session()
+                self.shell.get_pty()
+                self.shell = self.ssh.invoke_shell()
+
+                self.shell.send("ip r l\n")
+                time.sleep(2)
+                receive_buffer_1 = self.shell.recv(10000)
+                # self.shell.send("{}\n".format(self.VPNCommand))
+                # time.sleep(10)
+                # receive_buffer_2 = self.shell.recv(6000)
+
+                self.shell.send("ssh {}@{}\n".format("admin", "192.168.180.247"))
+                time.sleep(3)
+                self.shell.send("{}\n".format("Passw0rd!"))
+                time.sleep(2)
+                receive_buffer_3 = self.shell.recv(6000)
+        except Exception as e:
+            retry = retry - 1
+            if retry <= 0:
+                raise
+            print("SSH connect failed: %s retrying in %s seconds" %(str(e), Simulate.SSH_RETRY_INTERVAL))
+            time.sleep(self.SSH_RETRY_INTERVAL)
+            self.ssh_to_remote_machine(retry)
+
+        except Exception as e:
+            print("Excepyion in ssh_to_remote_machine method: {}".format(e))
+            raise
+        return True
+
 obj = Simulate()
 if Simulate.mode == 'collection':
     if Simulate.ip_address and Simulate.output_zip_file and Simulate.userName and Simulate.password:
         print("In collection method")
+        if obj.ssh_to_remote_machine():
+            print("Data collection may take few minutes....")
 
     else:
         print(100 * '*')
@@ -123,7 +166,6 @@ elif Simulate.mode == 'simulation':
         print("    python3.6 <path_to_Simpulate.py> --mode simulation --name <name_for_zip_file>")
         print("\n--name -> name fo zip file or full path of zip file to be created by Simulate.py.")
         print("\n---------------------------------------------------------------")
-
 else:
     print("-----------------------------------------------------------------")
     print("\nSyntex error. Please refer following: from last else")
